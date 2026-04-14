@@ -2,11 +2,11 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>AI PRO MAX FINAL</title>
+<title>AI FINAL PRO MAX</title>
 <style>
 body { background:#0f172a; color:white; text-align:center; font-family:Arial; }
-input { width:350px; padding:10px; font-size:16px; }
-button { padding:10px 15px; margin:5px; cursor:pointer; }
+input { width:360px; padding:10px; font-size:16px; }
+button { padding:10px; margin:5px; }
 .good { color:#22c55e; }
 .bad { color:#ef4444; }
 .warn { color:#facc15; }
@@ -15,7 +15,7 @@ canvas { margin-top:15px; }
 </head>
 <body>
 
-<h1>🤖 AI PRO MAX FINAL</h1>
+<h1>🤖 AI FINAL PRO MAX</h1>
 
 <input id="input" placeholder="133,225,... hoặc LBLBL">
 <br>
@@ -26,26 +26,23 @@ canvas { margin-top:15px; }
 <div id="out"></div>
 
 <div id="feedback" style="display:none;">
-    <h3>Kết quả đúng không?</h3>
     <button onclick="feedback(true)">ĐÚNG</button>
     <button onclick="feedback(false)">SAI</button>
 </div>
 
 <script>
 
-// ====== STATE ======
-let weights = JSON.parse(localStorage.getItem("weights")) || {m1:0.3,m2:0.4,m3:0.3};
+// ===== STATE =====
+let weights = JSON.parse(localStorage.getItem("weights")) || {m1:0.25,m2:0.35,m3:0.25,p3:0.15};
 let bank = Number(localStorage.getItem("bank")) || 20000;
 let winStreak = Number(localStorage.getItem("winStreak")) || 0;
 let loseStreak = Number(localStorage.getItem("loseStreak")) || 0;
 
 let lastBet = 0;
-let lastPrediction = null;
 
-// ====== PARSE ======
+// ===== PARSE =====
 function parse(input){
     input=input.replace(/\s/g,"");
-
     if(/[0-9]/.test(input)){
         return input.split(",").map(x=>{
             let s=x.split("").reduce((a,b)=>a+ +b,0);
@@ -55,7 +52,7 @@ function parse(input){
     return input.split("");
 }
 
-// ====== MARKOV ======
+// ===== MARKOV =====
 function m1(d){
     let last=d[d.length-1], L=0,B=0;
     for(let i=0;i<d.length-1;i++){
@@ -91,62 +88,105 @@ function m3(d){
     return {L:L/t,B:B/t};
 }
 
-// ====== HEATMAP ======
-function heat(data){
-    let m={LL:0,LB:0,BL:0,BB:0};
-    let n=data.length;
+// ===== PATTERN 3 =====
+function pattern3(d){
+    let map={};
+    for(let i=0;i<d.length-3;i++){
+        let key=d[i]+d[i+1]+d[i+2];
+        let next=d[i+3];
+        if(!map[key]) map[key]={L:0,B:0};
+        map[key][next]++;
+    }
+    return map;
+}
 
+function predictP3(d,map){
+    let key=d.slice(-3).join("");
+    if(!map[key]) return {valid:false};
+    let L=map[key].L, B=map[key].B;
+    let t=L+B;
+    return {valid:true,pL:L/t,pB:B/t,key};
+}
+
+// ===== HEATMAP =====
+function heat(d){
+    let m={LL:0,LB:0,BL:0,BB:0};
+    let n=d.length;
     for(let i=0;i<n-1;i++){
         let w=(i+1)/n;
-        m[data[i]+data[i+1]]+=w;
+        m[d[i]+d[i+1]]+=w;
     }
-
     let t=Object.values(m).reduce((a,b)=>a+b,0);
     for(let k in m) m[k]/=t;
-
     return m;
 }
 
+// ===== DRAW =====
 function draw(m){
-    let c=document.getElementById("heatmap");
-    let ctx=c.getContext("2d");
-
-    function box(x,y,v,label){
-        let col=Math.floor(v*255);
-        ctx.fillStyle=`rgb(${col},0,0)`;
+    let ctx=document.getElementById("heatmap").getContext("2d");
+    function box(x,y,v,l){
+        let c=Math.floor(v*255);
+        ctx.fillStyle=`rgb(${c},0,0)`;
         ctx.fillRect(x,y,120,120);
         ctx.fillStyle="white";
-        ctx.fillText(label,x+10,y+20);
+        ctx.fillText(l,x+10,y+20);
         ctx.fillText((v*100).toFixed(1)+"%",x+10,y+50);
     }
-
     ctx.clearRect(0,0,300,300);
-
     box(0,0,m.LL,"L→L");
     box(150,0,m.LB,"L→B");
     box(0,150,m.BL,"B→L");
     box(150,150,m.BB,"B→B");
 }
 
-// ====== PATTERN ======
+// ===== PATTERN =====
 function pattern(d){
     let s=d.join("");
     if(/LLLL|BBBB/.test(s)) return "BỆT";
-    if(/LBLB|BLBL/.test(s)) return "1-1";
+    if(isReal11(d)) return "1-1";
     return "LOẠN";
 }
 
-// ====== SCORE ======
+// ===== 1-1 =====
+function isReal11(d){
+    let c=1;
+    for(let i=d.length-1;i>0;i--){
+        if(d[i]!==d[i-1]) c++; else break;
+    }
+    return c>=5;
+}
+
+// ===== ANTI TRAP =====
+function detectTrap(d,m,conf){
+    let s=d.join("");
+
+    if(isReal11(d)) return {trap:false};
+
+    if(/(LB){3,}|(BL){3,}/.test(s)){
+        return {trap:true,reason:"Cầu zigzag giả"};
+    }
+
+    let vals=Object.values(m).sort((a,b)=>b-a);
+    if(vals[0]-vals[1]<0.08){
+        return {trap:true,reason:"Heatmap nhiễu"};
+    }
+
+    if(conf>65 && vals[0]<0.4){
+        return {trap:true,reason:"Xác suất ảo"};
+    }
+
+    return {trap:false};
+}
+
+// ===== SCORE =====
 function score(pL,pB,m,pat){
     let s=0;
-
     let max=Math.max(pL,pB);
     if(max>0.6) s+=2;
     else if(max>0.55) s+=1;
 
     let vals=Object.values(m).sort((a,b)=>b-a);
     if(vals[0]-vals[1]>0.15) s+=2;
-    else if(vals[0]-vals[1]>0.08) s+=1;
 
     if(pat==="BỆT") s+=1;
     if(pat==="LOẠN") s-=2;
@@ -154,134 +194,99 @@ function score(pL,pB,m,pat){
     return s;
 }
 
-// ====== WARNING ======
-function getWarning(bank, winStreak, loseStreak, pattern, confidence){
-
-    if(bank <= 10000){
-        return {level:"danger", msg:"⚠️ Vốn giảm mạnh - nên dừng"};
-    }
-
-    if(loseStreak >= 2){
-        return {level:"danger", msg:"⚠️ Thua liên tiếp - nên nghỉ"};
-    }
-
-    if(pattern==="LOẠN" && confidence<60){
-        return {level:"warn", msg:"⚠️ Cầu nhiễu"};
-    }
-
-    return {level:"safe", msg:"✅ Có thể đánh"};
-}
-
-// ====== BET ======
-function suggestBet(score, confidence, warning){
-
-    if(warning.level==="danger"){
-        return {bet:0, action:"NÊN DỪNG"};
-    }
+// ===== BET =====
+function suggestBet(sc,conf){
+    if(sc<2) return {bet:0,action:"KHÔNG ĐÁNH"};
 
     let percent=0.05;
+    if(conf>65) percent=0.1;
+    if(conf>75) percent=0.15;
 
-    if(warning.level==="warn") percent=0.03;
-    if(confidence>65) percent=0.1;
-    if(confidence>75) percent=0.15;
-
-    percent += winStreak*0.02;
-    percent -= loseStreak*0.02;
+    percent+=winStreak*0.02;
+    percent-=loseStreak*0.02;
 
     if(percent<0.02) percent=0.02;
 
     let bet=Math.floor(bank*percent);
+    lastBet=bet;
 
-    lastBet = bet;
-
-    return {bet, action:"ĐÁNH"};
+    return {bet,action:"ĐÁNH"};
 }
 
-// ====== MAIN ======
+// ===== MAIN =====
 function run(){
-
-    let raw=document.getElementById("input").value;
-    let d=parse(raw);
-
-    if(d.length<5){
-        alert("Nhập >=5 phiên");
-        return;
-    }
+    let d=parse(document.getElementById("input").value);
+    if(d.length<5) return alert("Nhập >=5");
 
     let r1=m1(d), r2=m2(d), r3=m3(d);
 
     let pL=r1.L*weights.m1 + r2.L*weights.m2 + r3.L*weights.m3;
     let pB=r1.B*weights.m1 + r2.B*weights.m2 + r3.B*weights.m3;
 
+    let p3map=pattern3(d);
+    let p3=predictP3(d,p3map);
+
+    if(p3.valid){
+        pL=pL*0.8 + p3.pL*0.2;
+        pB=pB*0.8 + p3.pB*0.2;
+    }
+
     let m=heat(d);
     draw(m);
 
+    let conf=Math.max(pL,pB)*100;
     let pat=pattern(d);
+
+    let trap=detectTrap(d,m,conf);
+    if(trap.trap){
+        document.getElementById("out").innerHTML=`❌ BẪY: ${trap.reason}`;
+        return;
+    }
+
     let sc=score(pL,pB,m,pat);
+    let bet=suggestBet(sc,conf);
 
-    let confidence=Math.max(pL,pB)*100;
-
-    let warn=getWarning(bank,winStreak,loseStreak,pat,confidence);
-    let betInfo=suggestBet(sc,confidence,warn);
-
-    let result = pL>pB?"LỚN":"BÉ";
-
-    lastPrediction = result;
+    let result=pL>pB?"LỚN":"BÉ";
 
     document.getElementById("out").innerHTML=`
-        Cầu: ${pat}<br>
-        Score: ${sc}<br>
-        L: ${(pL*100).toFixed(1)}% | B: ${(pB*100).toFixed(1)}%<br><br>
         🔮 ${result}<br>
-        💰 Vốn: ${bank}<br>
-        👉 ${betInfo.action} ${betInfo.bet}đ<br><br>
-        <b class="${
-            warn.level==="danger"?"bad":
-            warn.level==="warn"?"warn":"good"
-        }">${warn.msg}</b>
+        L:${(pL*100).toFixed(1)}% B:${(pB*100).toFixed(1)}%<br>
+        Score:${sc}<br>
+        💰 ${bet.action} ${bet.bet}đ
     `;
 
     document.getElementById("feedback").style.display="block";
 }
 
-// ====== AI LEARN ======
+// ===== AI LEARN =====
 function feedback(correct){
 
     let lr=0.05;
 
     if(correct){
-        bank += lastBet;
-        winStreak++;
-        loseStreak=0;
-
-        weights.m1+=lr;
-        weights.m2+=lr;
-        weights.m3+=lr;
-
+        bank+=lastBet;
+        winStreak++; loseStreak=0;
+        weights.m1+=lr; weights.m2+=lr; weights.m3+=lr;
     }else{
-        bank -= lastBet;
-        loseStreak++;
-        winStreak=0;
-
-        weights.m1-=lr;
-        weights.m2-=lr;
-        weights.m3-=lr;
+        bank-=lastBet;
+        loseStreak++; winStreak=0;
+        weights.m1-=lr; weights.m2-=lr; weights.m3-=lr;
     }
 
     let sum=weights.m1+weights.m2+weights.m3;
-    weights.m1/=sum;
-    weights.m2/=sum;
-    weights.m3/=sum;
+    weights.m1/=sum; weights.m2/=sum; weights.m3/=sum;
 
     localStorage.setItem("weights",JSON.stringify(weights));
     localStorage.setItem("bank",bank);
     localStorage.setItem("winStreak",winStreak);
     localStorage.setItem("loseStreak",loseStreak);
 
-    document.getElementById("out").innerHTML += "<br>🤖 AI đã cập nhật!";
+    document.getElementById("input").value="";
+    document.getElementById("out").innerHTML=`🤖 AI đã học xong | Vốn: ${bank}`;
+    document.getElementById("feedback").style.display="none";
+    document.getElementById("input").focus();
 }
 
 </script>
-
 </body>
 </html>
