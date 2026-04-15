@@ -2,291 +2,284 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>AI FINAL PRO MAX</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI PRO MAX FINAL</title>
+
 <style>
-body { background:#0f172a; color:white; text-align:center; font-family:Arial; }
-input { width:360px; padding:10px; font-size:16px; }
-button { padding:10px; margin:5px; }
-.good { color:#22c55e; }
-.bad { color:#ef4444; }
-.warn { color:#facc15; }
-canvas { margin-top:15px; }
+body{margin:0;background:#0f172a;color:white;font-family:-apple-system;}
+.app{max-width:420px;margin:auto;padding:15px;}
+.header{text-align:center;font-size:22px;font-weight:bold;}
+input{
+width:100%;padding:14px;border-radius:12px;border:none;margin-top:10px;
+background:#1e293b;color:white;text-align:center;font-size:18px;
+}
+.card{background:#111827;padding:15px;border-radius:16px;margin-top:15px;}
+.status{text-align:center;font-size:28px;font-weight:bold;}
+.bar{height:10px;background:#374151;border-radius:10px;margin-top:10px;}
+.fill{height:100%;background:#22c55e;width:0%;}
+.info{text-align:center;margin-top:10px;color:#9ca3af;}
+.row{display:flex;gap:10px;margin-top:10px;}
+button{flex:1;padding:12px;border:none;border-radius:10px;font-weight:bold;}
+.yes{background:#22c55e;}
+.no{background:#ef4444;}
 </style>
 </head>
+
 <body>
 
-<h1>🤖 AI FINAL PRO MAX</h1>
+<div class="app">
+<div class="header">🤖 AI PRO MAX FINAL</div>
 
-<input id="input" placeholder="133,225,... hoặc LBLBL">
-<br>
-<button onclick="run()">Phân tích</button>
+<input id="input" placeholder="Nhập 3 số rồi Enter...">
 
-<canvas id="heatmap" width="300" height="300"></canvas>
+<div class="card">
+<div id="status" class="status">Nhập dữ liệu</div>
 
-<div id="out"></div>
+<div class="bar"><div id="bar" class="fill"></div></div>
 
-<div id="feedback" style="display:none;">
-    <button onclick="feedback(true)">ĐÚNG</button>
-    <button onclick="feedback(false)">SAI</button>
+<div id="info" class="info"></div>
+
+<div class="row" id="feedback" style="display:none;">
+<button class="yes" onclick="feedback(true)">ĐÚNG</button>
+<button class="no" onclick="feedback(false)">SAI</button>
+</div>
+</div>
 </div>
 
 <script>
 
 // ===== STATE =====
-let weights = JSON.parse(localStorage.getItem("weights")) || {m1:0.25,m2:0.35,m3:0.25,p3:0.15};
-let bank = Number(localStorage.getItem("bank")) || 20000;
-let winStreak = Number(localStorage.getItem("winStreak")) || 0;
-let loseStreak = Number(localStorage.getItem("loseStreak")) || 0;
+let autoData=[];
+let MAX=6;
 
-let lastBet = 0;
+let bank=Number(localStorage.getItem("bank"))||20000;
+let win=Number(localStorage.getItem("win"))||0;
+let lose=Number(localStorage.getItem("lose"))||0;
+let memory=JSON.parse(localStorage.getItem("memory"))||{};
+
+let lastBet=0,lastKey="",lastResult="";
+
+// ===== DATA CŨ =====
+let baseData=["B","B","L","L","L","B","L","B","L","B","B","L","L","L","L","B","L","L","L","B"];
+
+// ===== AUTO INPUT =====
+function autoAdd(val){
+if(!/^\d{3}$/.test(val)) return;
+autoData.push(val);
+if(autoData.length>MAX) autoData.shift();
+document.getElementById("input").value=autoData.join(",");
+}
 
 // ===== PARSE =====
-function parse(input){
-    input=input.replace(/\s/g,"");
-    if(/[0-9]/.test(input)){
-        return input.split(",").map(x=>{
-            let s=x.split("").reduce((a,b)=>a+ +b,0);
-            return s<=10?"B":"L";
-        });
-    }
-    return input.split("");
+function parse(arr){
+return arr.map(x=>{
+let s=x.split("").reduce((a,b)=>a+ +b,0);
+return s<=10?"B":"L";
+});
+}
+
+// ===== MERGE =====
+function mergeData(newData){
+let merged=[...baseData];
+newData.forEach(x=>{
+merged.push(x);
+merged.push(x);
+});
+return merged;
+}
+
+// ===== RELIABILITY =====
+function reliability(d){
+let c=0;
+for(let i=1;i<d.length;i++){
+if(d[i]!==d[i-1]) c++;
+}
+return 1-c/(d.length-1);
 }
 
 // ===== MARKOV =====
-function m1(d){
-    let last=d[d.length-1], L=0,B=0;
-    for(let i=0;i<d.length-1;i++){
-        if(d[i]===last){
-            d[i+1]==="L"?L++:B++;
-        }
-    }
-    let t=L+B||1;
-    return {L:L/t,B:B/t};
+function markov(d){
+let L=0,B=0;
+for(let i=0;i<d.length-1;i++){
+let w=(i+1)/d.length;
+d[i+1]==="L"?L+=w:B+=w;
 }
-
-function m2(d){
-    if(d.length<3) return {L:0.5,B:0.5};
-    let p=d.slice(-2).join(""), L=0,B=0;
-    for(let i=0;i<d.length-2;i++){
-        if(d[i]+d[i+1]===p){
-            d[i+2]==="L"?L++:B++;
-        }
-    }
-    let t=L+B||1;
-    return {L:L/t,B:B/t};
-}
-
-function m3(d){
-    if(d.length<4) return {L:0.5,B:0.5};
-    let p=d.slice(-3).join(""), L=0,B=0;
-    for(let i=0;i<d.length-3;i++){
-        if(d[i]+d[i+1]+d[i+2]===p){
-            d[i+3]==="L"?L++:B++;
-        }
-    }
-    let t=L+B||1;
-    return {L:L/t,B:B/t};
-}
-
-// ===== PATTERN 3 =====
-function pattern3(d){
-    let map={};
-    for(let i=0;i<d.length-3;i++){
-        let key=d[i]+d[i+1]+d[i+2];
-        let next=d[i+3];
-        if(!map[key]) map[key]={L:0,B:0};
-        map[key][next]++;
-    }
-    return map;
-}
-
-function predictP3(d,map){
-    let key=d.slice(-3).join("");
-    if(!map[key]) return {valid:false};
-    let L=map[key].L, B=map[key].B;
-    let t=L+B;
-    return {valid:true,pL:L/t,pB:B/t,key};
-}
-
-// ===== HEATMAP =====
-function heat(d){
-    let m={LL:0,LB:0,BL:0,BB:0};
-    let n=d.length;
-    for(let i=0;i<n-1;i++){
-        let w=(i+1)/n;
-        m[d[i]+d[i+1]]+=w;
-    }
-    let t=Object.values(m).reduce((a,b)=>a+b,0);
-    for(let k in m) m[k]/=t;
-    return m;
-}
-
-// ===== DRAW =====
-function draw(m){
-    let ctx=document.getElementById("heatmap").getContext("2d");
-    function box(x,y,v,l){
-        let c=Math.floor(v*255);
-        ctx.fillStyle=`rgb(${c},0,0)`;
-        ctx.fillRect(x,y,120,120);
-        ctx.fillStyle="white";
-        ctx.fillText(l,x+10,y+20);
-        ctx.fillText((v*100).toFixed(1)+"%",x+10,y+50);
-    }
-    ctx.clearRect(0,0,300,300);
-    box(0,0,m.LL,"L→L");
-    box(150,0,m.LB,"L→B");
-    box(0,150,m.BL,"B→L");
-    box(150,150,m.BB,"B→B");
+let t=L+B||1;
+return {pL:L/t,pB:B/t};
 }
 
 // ===== PATTERN =====
-function pattern(d){
-    let s=d.join("");
-    if(/LLLL|BBBB/.test(s)) return "BỆT";
-    if(isReal11(d)) return "1-1";
-    return "LOẠN";
+function pattern3(d){
+let map={};
+for(let i=0;i<d.length-3;i++){
+let key=d[i]+d[i+1]+d[i+2];
+let next=d[i+3];
+if(!map[key]) map[key]={L:0,B:0,total:0};
+let w=(i+1)/d.length;
+map[key][next]+=w;
+map[key].total+=w;
+}
+return map;
 }
 
-// ===== 1-1 =====
-function isReal11(d){
-    let c=1;
-    for(let i=d.length-1;i>0;i--){
-        if(d[i]!==d[i-1]) c++; else break;
-    }
-    return c>=5;
+// ===== AI =====
+function getAIWeight(key){
+if(!memory[key]) return 0.5;
+let {win,lose}=memory[key];
+let t=win+lose;
+if(t<3) return 0.5;
+return win/t;
 }
 
-// ===== ANTI TRAP =====
-function detectTrap(d,m,conf){
-    let s=d.join("");
-
-    if(isReal11(d)) return {trap:false};
-
-    if(/(LB){3,}|(BL){3,}/.test(s)){
-        return {trap:true,reason:"Cầu zigzag giả"};
-    }
-
-    let vals=Object.values(m).sort((a,b)=>b-a);
-    if(vals[0]-vals[1]<0.08){
-        return {trap:true,reason:"Heatmap nhiễu"};
-    }
-
-    if(conf>65 && vals[0]<0.4){
-        return {trap:true,reason:"Xác suất ảo"};
-    }
-
-    return {trap:false};
+function learnPattern(key,correct){
+if(!memory[key]) memory[key]={win:0,lose:0};
+correct?memory[key].win++:memory[key].lose++;
+localStorage.setItem("memory",JSON.stringify(memory));
 }
 
-// ===== SCORE =====
-function score(pL,pB,m,pat){
-    let s=0;
-    let max=Math.max(pL,pB);
-    if(max>0.6) s+=2;
-    else if(max>0.55) s+=1;
+// ===== CI FILTER =====
+function markovCI(d,last){
+let nextB=0,total=0;
+for(let i=0;i<d.length-1;i++){
+if(d[i]===last){
+total++;
+if(d[i+1]==="B") nextB++;
+}
+}
+if(total<10) return null;
 
-    let vals=Object.values(m).sort((a,b)=>b-a);
-    if(vals[0]-vals[1]>0.15) s+=2;
+let p=nextB/total;
+let SE=Math.sqrt((p*(1-p))/total);
+let left=p-1.96*SE;
+let right=p+1.96*SE;
 
-    if(pat==="BỆT") s+=1;
-    if(pat==="LOẠN") s-=2;
-
-    return s;
+return {left,right};
 }
 
-// ===== BET =====
-function suggestBet(sc,conf){
-    if(sc<2) return {bet:0,action:"KHÔNG ĐÁNH"};
-
-    let percent=0.05;
-    if(conf>65) percent=0.1;
-    if(conf>75) percent=0.15;
-
-    percent+=winStreak*0.02;
-    percent-=loseStreak*0.02;
-
-    if(percent<0.02) percent=0.02;
-
-    let bet=Math.floor(bank*percent);
-    lastBet=bet;
-
-    return {bet,action:"ĐÁNH"};
-}
-
-// ===== MAIN =====
+// ===== RUN =====
 function run(){
-    let d=parse(document.getElementById("input").value);
-    if(d.length<5) return alert("Nhập >=5");
 
-    let r1=m1(d), r2=m2(d), r3=m3(d);
-
-    let pL=r1.L*weights.m1 + r2.L*weights.m2 + r3.L*weights.m3;
-    let pB=r1.B*weights.m1 + r2.B*weights.m2 + r3.B*weights.m3;
-
-    let p3map=pattern3(d);
-    let p3=predictP3(d,p3map);
-
-    if(p3.valid){
-        pL=pL*0.8 + p3.pL*0.2;
-        pB=pB*0.8 + p3.pB*0.2;
-    }
-
-    let m=heat(d);
-    draw(m);
-
-    let conf=Math.max(pL,pB)*100;
-    let pat=pattern(d);
-
-    let trap=detectTrap(d,m,conf);
-    if(trap.trap){
-        document.getElementById("out").innerHTML=`❌ BẪY: ${trap.reason}`;
-        return;
-    }
-
-    let sc=score(pL,pB,m,pat);
-    let bet=suggestBet(sc,conf);
-
-    let result=pL>pB?"LỚN":"BÉ";
-
-    document.getElementById("out").innerHTML=`
-        🔮 ${result}<br>
-        L:${(pL*100).toFixed(1)}% B:${(pB*100).toFixed(1)}%<br>
-        Score:${sc}<br>
-        💰 ${bet.action} ${bet.bet}đ
-    `;
-
-    document.getElementById("feedback").style.display="block";
+if(autoData.length<6){
+show("Chưa đủ dữ liệu","warn",0);
+return;
 }
 
-// ===== AI LEARN =====
+let newData=parse(autoData);
+let d=mergeData(newData);
+
+let rel=reliability(d);
+if(rel<0.45){
+show("❌ Cầu loạn","bad",0);
+return;
+}
+
+let mk=markov(d);
+let p3map=pattern3(d);
+let key=d.slice(-3).join("");
+let p3=p3map[key];
+
+if(!p3||p3.total<1){
+show("⚠️ Pattern yếu","warn",0);
+return;
+}
+
+let pL=mk.pL*0.6+(p3.L/p3.total)*0.4;
+let pB=mk.pB*0.6+(p3.B/p3.total)*0.4;
+
+// AI
+let aiW=getAIWeight(key);
+pL=pL*0.7+aiW*0.3;
+pB=1-pL;
+
+// CI
+let last=d[d.length-1];
+let ci=markovCI(d,last);
+
+let conf=Math.max(pL,pB)*100;
+
+if(ci){
+if(ci.left>0.55){pB*=1.2;pL*=0.8;}
+else if(ci.right<0.45){pL*=1.2;pB*=0.8;}
+else{conf*=0.8;}
+}
+
+if(conf<62){
+show("⚠️ Không đủ edge","warn",conf);
+return;
+}
+
+let result=pL>pB?"LỚN":"BÉ";
+
+let percent=0.05+win*0.02-lose*0.02;
+if(percent<0.02) percent=0.02;
+
+let bet=Math.floor(bank*percent);
+
+lastBet=bet;
+lastKey=key;
+lastResult=result;
+
+show("🎯 "+result,"good",conf,bet,key,aiW);
+}
+
+// ===== UI =====
+function show(text,type,conf,bet,key,aiW){
+document.getElementById("status").innerText=text;
+document.getElementById("status").className="status "+type;
+document.getElementById("bar").style.width=conf+"%";
+
+document.getElementById("info").innerHTML=`
+${key?"Pattern: "+key+"<br>":""}
+Confidence: ${conf.toFixed(1)}%<br>
+🤖 AI: ${(aiW*100||0).toFixed(1)}%<br>
+💰 Vốn: ${bank}<br>
+👉 ${bet||0}đ
+`;
+
+document.getElementById("feedback").style.display="flex";
+}
+
+// ===== FEEDBACK =====
 function feedback(correct){
 
-    let lr=0.05;
-
-    if(correct){
-        bank+=lastBet;
-        winStreak++; loseStreak=0;
-        weights.m1+=lr; weights.m2+=lr; weights.m3+=lr;
-    }else{
-        bank-=lastBet;
-        loseStreak++; winStreak=0;
-        weights.m1-=lr; weights.m2-=lr; weights.m3-=lr;
-    }
-
-    let sum=weights.m1+weights.m2+weights.m3;
-    weights.m1/=sum; weights.m2/=sum; weights.m3/=sum;
-
-    localStorage.setItem("weights",JSON.stringify(weights));
-    localStorage.setItem("bank",bank);
-    localStorage.setItem("winStreak",winStreak);
-    localStorage.setItem("loseStreak",loseStreak);
-
-    document.getElementById("input").value="";
-    document.getElementById("out").innerHTML=`🤖 AI đã học xong | Vốn: ${bank}`;
-    document.getElementById("feedback").style.display="none";
-    document.getElementById("input").focus();
+if(correct){
+bank+=lastBet;
+win++;lose=0;
+}else{
+bank-=lastBet;
+lose++;win=0;
 }
 
+learnPattern(lastKey,correct);
+
+localStorage.setItem("bank",bank);
+localStorage.setItem("win",win);
+localStorage.setItem("lose",lose);
+
+document.getElementById("status").innerText="Nhập tiếp";
+document.getElementById("bar").style.width="0%";
+document.getElementById("info").innerHTML="";
+document.getElementById("feedback").style.display="none";
+}
+
+// ===== INPUT =====
+document.getElementById("input").addEventListener("keypress",function(e){
+if(e.key==="Enter"){
+let val=this.value;
+
+if(!val.includes(",")){
+autoAdd(val);
+this.value="";
+return;
+}
+
+run();
+}
+});
+
+document.getElementById("input").focus();
+
 </script>
+
 </body>
 </html>
