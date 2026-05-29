@@ -1,285 +1,67 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI PRO MAX FINAL</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>An Café Logo</title>
+    <!-- Import Google Font tương đồng (Montserrat) -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Đặt nền màu đỏ sẫm tương tự ảnh */
+        body {
+            background-color: #b52026; 
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Montserrat', sans-serif;
+        }
 
-<style>
-body{margin:0;background:#0f172a;color:white;font-family:-apple-system;}
-.app{max-width:420px;margin:auto;padding:15px;}
-.header{text-align:center;font-size:22px;font-weight:bold;}
-input{
-width:100%;padding:14px;border-radius:12px;border:none;margin-top:10px;
-background:#1e293b;color:white;text-align:center;font-size:18px;
-}
-.card{background:#111827;padding:15px;border-radius:16px;margin-top:15px;}
-.status{text-align:center;font-size:28px;font-weight:bold;}
-.bar{height:10px;background:#374151;border-radius:10px;margin-top:10px;}
-.fill{height:100%;background:#22c55e;width:0%;}
-.info{text-align:center;margin-top:10px;color:#9ca3af;}
-.row{display:flex;gap:10px;margin-top:10px;}
-button{flex:1;padding:12px;border:none;border-radius:10px;font-weight:bold;}
-.yes{background:#22c55e;}
-.no{background:#ef4444;}
-</style>
+        /* Container chứa toàn bộ logo */
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 15px; /* Khoảng cách giữa icon và text */
+        }
+
+        /* Khung chứa icon chữ A */
+        .logo-mark {
+            width: 140px;
+            height: auto;
+        }
+
+        /* Chữ AN CAFÉ */
+        .logo-text {
+            color: #FFFFFF;
+            font-size: 34px;
+            font-weight: 700;
+            letter-spacing: 4px; /* Tạo khoảng cách chữ rộng giống ảnh */
+            margin: 0;
+            text-transform: uppercase;
+        }
+    </style>
 </head>
-
 <body>
 
-<div class="app">
-<div class="header">🤖 AI PRO MAX FINAL</div>
+    <div class="logo-container">
+        <!-- Biểu tượng chữ A bằng SVG -->
+        <svg class="logo-mark" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+            <g fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="square" stroke-linejoin="miter">
+                <!-- Đường chéo bên phải và cạnh đáy -->
+                <path d="M 60 20 L 95 90 L 70 90 L 63 75 M 50 50 L 75 50" />
+                
+                <!-- Đường chéo bên trái và vòng lặp giọt nước -->
+                <path d="M 60 20 L 35 70 C 30 80 40 95 50 85 C 60 75 50 60 45 65" />
+            </g>
+        </svg>
 
-<input id="input" placeholder="Nhập 3 số rồi Enter...">
-
-<div class="card">
-<div id="status" class="status">Nhập dữ liệu</div>
-
-<div class="bar"><div id="bar" class="fill"></div></div>
-
-<div id="info" class="info"></div>
-
-<div class="row" id="feedback" style="display:none;">
-<button class="yes" onclick="feedback(true)">ĐÚNG</button>
-<button class="no" onclick="feedback(false)">SAI</button>
-</div>
-</div>
-</div>
-
-<script>
-
-// ===== STATE =====
-let autoData=[];
-let MAX=6;
-
-let bank=Number(localStorage.getItem("bank"))||20000;
-let win=Number(localStorage.getItem("win"))||0;
-let lose=Number(localStorage.getItem("lose"))||0;
-let memory=JSON.parse(localStorage.getItem("memory"))||{};
-
-let lastBet=0,lastKey="",lastResult="";
-
-// ===== DATA CŨ =====
-let baseData=["B","B","L","L","L","B","L","B","L","B","B","L","L","L","L","B","L","L","L","B"];
-
-// ===== AUTO INPUT =====
-function autoAdd(val){
-if(!/^\d{3}$/.test(val)) return;
-autoData.push(val);
-if(autoData.length>MAX) autoData.shift();
-document.getElementById("input").value=autoData.join(",");
-}
-
-// ===== PARSE =====
-function parse(arr){
-return arr.map(x=>{
-let s=x.split("").reduce((a,b)=>a+ +b,0);
-return s<=10?"B":"L";
-});
-}
-
-// ===== MERGE =====
-function mergeData(newData){
-let merged=[...baseData];
-newData.forEach(x=>{
-merged.push(x);
-merged.push(x);
-});
-return merged;
-}
-
-// ===== RELIABILITY =====
-function reliability(d){
-let c=0;
-for(let i=1;i<d.length;i++){
-if(d[i]!==d[i-1]) c++;
-}
-return 1-c/(d.length-1);
-}
-
-// ===== MARKOV =====
-function markov(d){
-let L=0,B=0;
-for(let i=0;i<d.length-1;i++){
-let w=(i+1)/d.length;
-d[i+1]==="L"?L+=w:B+=w;
-}
-let t=L+B||1;
-return {pL:L/t,pB:B/t};
-}
-
-// ===== PATTERN =====
-function pattern3(d){
-let map={};
-for(let i=0;i<d.length-3;i++){
-let key=d[i]+d[i+1]+d[i+2];
-let next=d[i+3];
-if(!map[key]) map[key]={L:0,B:0,total:0};
-let w=(i+1)/d.length;
-map[key][next]+=w;
-map[key].total+=w;
-}
-return map;
-}
-
-// ===== AI =====
-function getAIWeight(key){
-if(!memory[key]) return 0.5;
-let {win,lose}=memory[key];
-let t=win+lose;
-if(t<3) return 0.5;
-return win/t;
-}
-
-function learnPattern(key,correct){
-if(!memory[key]) memory[key]={win:0,lose:0};
-correct?memory[key].win++:memory[key].lose++;
-localStorage.setItem("memory",JSON.stringify(memory));
-}
-
-// ===== CI FILTER =====
-function markovCI(d,last){
-let nextB=0,total=0;
-for(let i=0;i<d.length-1;i++){
-if(d[i]===last){
-total++;
-if(d[i+1]==="B") nextB++;
-}
-}
-if(total<10) return null;
-
-let p=nextB/total;
-let SE=Math.sqrt((p*(1-p))/total);
-let left=p-1.96*SE;
-let right=p+1.96*SE;
-
-return {left,right};
-}
-
-// ===== RUN =====
-function run(){
-
-if(autoData.length<6){
-show("Chưa đủ dữ liệu","warn",0);
-return;
-}
-
-let newData=parse(autoData);
-let d=mergeData(newData);
-
-let rel=reliability(d);
-if(rel<0.45){
-show("❌ Cầu loạn","bad",0);
-return;
-}
-
-let mk=markov(d);
-let p3map=pattern3(d);
-let key=d.slice(-3).join("");
-let p3=p3map[key];
-
-if(!p3||p3.total<1){
-show("⚠️ Pattern yếu","warn",0);
-return;
-}
-
-let pL=mk.pL*0.6+(p3.L/p3.total)*0.4;
-let pB=mk.pB*0.6+(p3.B/p3.total)*0.4;
-
-// AI
-let aiW=getAIWeight(key);
-pL=pL*0.7+aiW*0.3;
-pB=1-pL;
-
-// CI
-let last=d[d.length-1];
-let ci=markovCI(d,last);
-
-let conf=Math.max(pL,pB)*100;
-
-if(ci){
-if(ci.left>0.55){pB*=1.2;pL*=0.8;}
-else if(ci.right<0.45){pL*=1.2;pB*=0.8;}
-else{conf*=0.8;}
-}
-
-if(conf<62){
-show("⚠️ Không đủ edge","warn",conf);
-return;
-}
-
-let result=pL>pB?"LỚN":"BÉ";
-
-let percent=0.05+win*0.02-lose*0.02;
-if(percent<0.02) percent=0.02;
-
-let bet=Math.floor(bank*percent);
-
-lastBet=bet;
-lastKey=key;
-lastResult=result;
-
-show("🎯 "+result,"good",conf,bet,key,aiW);
-}
-
-// ===== UI =====
-function show(text,type,conf,bet,key,aiW){
-document.getElementById("status").innerText=text;
-document.getElementById("status").className="status "+type;
-document.getElementById("bar").style.width=conf+"%";
-
-document.getElementById("info").innerHTML=`
-${key?"Pattern: "+key+"<br>":""}
-Confidence: ${conf.toFixed(1)}%<br>
-🤖 AI: ${(aiW*100||0).toFixed(1)}%<br>
-💰 Vốn: ${bank}<br>
-👉 ${bet||0}đ
-`;
-
-document.getElementById("feedback").style.display="flex";
-}
-
-// ===== FEEDBACK =====
-function feedback(correct){
-
-if(correct){
-bank+=lastBet;
-win++;lose=0;
-}else{
-bank-=lastBet;
-lose++;win=0;
-}
-
-learnPattern(lastKey,correct);
-
-localStorage.setItem("bank",bank);
-localStorage.setItem("win",win);
-localStorage.setItem("lose",lose);
-
-document.getElementById("status").innerText="Nhập tiếp";
-document.getElementById("bar").style.width="0%";
-document.getElementById("info").innerHTML="";
-document.getElementById("feedback").style.display="none";
-}
-
-// ===== INPUT =====
-document.getElementById("input").addEventListener("keypress",function(e){
-if(e.key==="Enter"){
-let val=this.value;
-
-if(!val.includes(",")){
-autoAdd(val);
-this.value="";
-return;
-}
-
-run();
-}
-});
-
-document.getElementById("input").focus();
-
-</script>
+        <!-- Chữ Logo -->
+        <h1 class="logo-text">AN CAFÉ</h1>
+    </div>
 
 </body>
 </html>
