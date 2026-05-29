@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>An Café Logo - Chuẩn Vector</title>
+    <title>An Café Logo</title>
     <style>
         /* Màu nền đỏ đô chuẩn theo ảnh */
         body {
@@ -18,33 +18,15 @@
         /* Kích thước hiển thị của biểu tượng */
         .logo-mark {
             width: 250px;
+            max-width: 80%; /* Giúp logo không bị tràn viền trên màn hình điện thoại nhỏ */
             height: auto;
         }
     </style>
 </head>
 <body>
 
-    <!-- Mã SVG chuẩn xác (Tỷ lệ 200x200) -->
     <svg class="logo-mark" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-        <!-- Sử dụng fill-rule="evenodd" để đục lỗ giọt nước tự động -->
-        <path fill="#FFFFFF" fill-rule="evenodd" d="
-            <!-- 1. CHU VI VỎ NGOÀI CỦA LOGO -->
-            M 90 20
-            L 110 20
-            L 183 180
-            L 153 180
-            L 100 64
-            L 79 110
-            C 109 140, 94 180, 64 180
-            C 34 180, 19 140, 49 110
-            L 90 20 Z
-            
-            <!-- 2. KHÔNG GIAN ÂM: GIỌT NƯỚC BÊN TRONG -->
-            M 64 85
-            C 55 105, 49 125, 49 140
-            A 15 15 0 0 0 79 140
-            C 79 125, 73 105, 64 85 Z
-        "/>
+        <path fill="#FFFFFF" fill-rule="evenodd" d="M 90 20 L 110 20 L 183 180 L 153 180 L 100 64 L 79 110 C 109 140, 94 180, 64 180 C 34 180, 19 140, 49 110 L 90 20 Z M 64 85 C 55 105, 49 125, 49 140 A 15 15 0 0 0 79 140 C 79 125, 73 105, 64 85 Z" />
     </svg>
 
 </body>
